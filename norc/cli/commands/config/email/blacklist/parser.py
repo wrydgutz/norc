@@ -1,4 +1,4 @@
-# norc/cli/commands/config/email/blaclist/parser.py
+# norc/cli/commands/config/email/blacklist/parser.py
 # MIT License © 2025 Wrydrick Gutierrez
 
 import sys
