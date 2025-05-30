@@ -3,6 +3,7 @@
 
 import sys
 
+from norc.cli.commands.config.email.accounts import parser as accounts_command
 from norc.cli.commands.config.email.blacklist import parser as blacklist_command
 
 COMMAND_NAME = "email"
@@ -16,8 +17,9 @@ def build_parser(subparsers):
 
     parser = subparsers.add_parser(COMMAND_NAME, description="Manage email settings")
 
-    email_subparsers = parser.add_subparsers(dest=DEST_COMMAND, help="Email commands")
+    email_subparsers = parser.add_subparsers(dest=DEST_COMMAND, help="Available commands")
     
+    accounts_command.build_parser(email_subparsers)
     blacklist_command.build_parser(email_subparsers)
     
     return parser
@@ -27,6 +29,7 @@ def dispatch(args, command):
         return
     
     subcommand = getattr(args, DEST_COMMAND)
+    accounts_command.dispatch(args, subcommand)
     blacklist_command.dispatch(args, subcommand)
     
     print("No config command specified", file=sys.stderr)
