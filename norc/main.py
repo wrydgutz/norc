@@ -13,7 +13,7 @@ def main():
     subparsers = parser.add_subparsers(dest="command",
                                        help="Available commands")
     
-    watch_parser = subparsers.add_parser(
+    run_parser = subparsers.add_parser(
         "run",
         description=(
             "Starts the entire program:\n"
