@@ -3,6 +3,8 @@
 
 import sys
 
+from norc.email.blacklist import load_blacklist
+
 COMMAND_NAME = "list"
 
 parser = None
@@ -18,5 +20,12 @@ def dispatch(args, command):
     if command != COMMAND_NAME:
         return
     
-    print("Listing blacklist items (placeholder)")
+    blacklist = load_blacklist()
+    if len(blacklist) == 0:
+        print("Blacklist is empty.")
+        sys.exit(0)
+    
+    for email_address in blacklist:
+        print(email_address)
+        
     sys.exit(0)

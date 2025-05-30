@@ -3,6 +3,8 @@
 
 import sys
 
+from norc.email.blacklist import remove_email_from_blacklist
+
 COMMAND_NAME = "remove"
 ARG_EMAIL_ADDRESS = "email_address"
 
@@ -21,5 +23,8 @@ def dispatch(args, command):
         return
     
     arg_email_address = getattr(args, ARG_EMAIL_ADDRESS)
-    print(f"Added to blacklist: {arg_email_address}")
-    sys.exit(0)
+    if remove_email_from_blacklist(arg_email_address):
+        print(f"Removed from blacklist: {arg_email_address}")
+        sys.exit(0)
+    else:
+        sys.exit(f"{arg_email_address} not found in blacklist.")
