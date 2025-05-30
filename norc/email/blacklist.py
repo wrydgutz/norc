@@ -48,6 +48,9 @@ def remove_email_from_blacklist(email_address):
     save_blacklist(blacklist)
     return True
 
+def clear_blacklist():
+    save_blacklist(set())
+
 def is_blacklisted(email_address):
     email_address = normalize_email_address(email_address)
     blacklist = load_blacklist()
