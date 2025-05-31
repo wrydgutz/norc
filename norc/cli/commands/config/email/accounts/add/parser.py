@@ -3,8 +3,7 @@
 
 import sys
 
-import norc.email.gmail as gmail
-import norc.email.accounts as accounts
+import norc.service.gmail_account_service as gmail
 
 COMMAND_NAME = "add"
 ARG_EMAIL_ADDRESS = "email_address"
@@ -22,13 +21,7 @@ def dispatch(args, command):
     if command != COMMAND_NAME:
         return
     
-    service, creds = gmail.authenticate()
-    profile = gmail.fetch_profile(service)
-    email_address = profile["emailAddress"]
-    gmail.save_token(email_address, creds)
-
-    print(f"Authenticated as {email_address}")
-
-    accounts.add(email_address)
+    email_address = gmail.authenticate_and_add_account()
     print(f"'{email_address}' authenticated and added.")
+
     sys.exit(0)
