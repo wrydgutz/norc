@@ -57,11 +57,11 @@ def refreshIfNeeded(email_address):
     return True
 
 def get_token_path(email_address):
-    token_path = os.path.join(get_email_directory(email_address), TOKEN_FILENAME)
+    token_path = os.path.join(get_user_directory(email_address), TOKEN_FILENAME)
     os.makedirs(os.path.dirname(token_path), exist_ok=True)
     return token_path
 
-def get_email_directory(email_address):
+def get_user_directory(email_address):
     return os.path.join(ACCOUNTS_DIR, sanitize_email(email_address))
 
 def sanitize_email(email_address):

@@ -2,8 +2,6 @@
 # MIT License © 2025 Wrydrick Gutierrez
 
 import os.path
-import pickle
-import time
 
 import norc.email.gmail as gmail
 
@@ -19,7 +17,7 @@ SCOPES = [
 TOKEN_PATH = "secrets/token.pickle"
 CREDENTIALS_PATH = "secrets/gmail_client_secret.json"
 
-HISTORY_ID_PATH = "secrets/history_id.txt"
+HISTORY_ID_FILENAME = "history_id.txt"
 
 POLL_INTERVAL_SEC_DEFAULT = 10
 
@@ -28,101 +26,61 @@ class Watcher:
         self.email_address = email_address
         self.poll_interval_sec = poll_interval_sec
 
+    def run(self, shutdown_event):
+        service = self.authenticate()
+
+        while not shutdown_event.is_set():
+            print(f"Watcher ({self.email_address}): Checking new emails...")
+            
+            history_id = self.load_history_id(service)
+
+            message_ids, new_history_id = self.check_for_new_emails(service, history_id)
+            if message_ids:
+                print(f"Watcher ({self.email_address}): Found new message IDs: {message_ids}")
+            if new_history_id:
+                self.save_history_id(new_history_id)
+                history_id = new_history_id
+
+            shutdown_event.wait(timeout=self.poll_interval_sec)
+
+        print(f"Watcher ({self.email_address}): stopped.", flush=True)
+            
     def authenticate(self):
         creds = gmail.load_token(self.email_address)
         if not gmail.refreshIfNeeded(self.email_address):
             return None
         return gmail.build_service(creds)
     
-    def run(self, shutdown_event):
-        service = self.authenticate()
-
-        while not shutdown_event.is_set():
-            print(f"Watcher ({self.email_address}): Checking new emails...")
-            # TODO: Implement
-            shutdown_event.wait(timeout=self.poll_interval_sec)
-
-        print(f"Watcher ({self.email_address}): stopped.", flush=True)
+    def load_history_id(self, service):
+        history_id_path = self.get_history_id_path()
+        if os.path.exists(history_id_path):
+            with open(history_id_path, "r") as file:
+                history_id = file.read().strip()
             
-
-
-# TODO: Remove as this is already in gmail.py but broken down into functions.
-def authenticate_gmail():
-    creds = None
-
-    # Load access token if it exists.
-    if os.path.exists(TOKEN_PATH):
-        with open(TOKEN_PATH, "rb") as token:
-            creds = pickle.load(token)
-
-    # Refresh or login if necessary.
-    if not creds or not creds.valid:
-        if creds and creds.expired and creds.refresh_token:
-            creds.refresh(Request())
-        else:
-            flow = InstalledAppFlow.from_client_secrets_file(CREDENTIALS_PATH, SCOPES)
-            creds = flow.run_local_server(port=0)
-
-        # Save the credentials for the next run.
-        os.makedirs(os.path.dirname(TOKEN_PATH), exist_ok=True)
-        with open(TOKEN_PATH, "wb") as token_file:
-            pickle.dump(creds, token_file)
-
-    # Return the authenticated service to be able to use Gmail API going forward.
-    service = build("gmail", "v1", credentials=creds)
-    return service
-
-def load_history_id(service):
-    if os.path.exists(HISTORY_ID_PATH):
-        with open(HISTORY_ID_PATH, "r") as f:
-            history_id = f.read().strip()
-        if history_id.isdigit():
-            history_id = int(history_id)
-        else: # Fallback
-            history_id = gmail.fetch_profile(service).get("historyId")
-    else:
+            if history_id.isdigit():
+                history_id = int(history_id)
+            else: # Fallback if history_id isn't valid or readable.
+                history_id = gmail.fetch_profile(service).get("historyId")
+            return history_id
+        
         history_id = gmail.fetch_profile(service).get("historyId")
-        save_history_id(history_id)
-    return history_id
+        return history_id
 
-def save_history_id(history_id):
-    os.makedirs(os.path.dirname(HISTORY_ID_PATH), exist_ok=True)
-    with open(HISTORY_ID_PATH, "w") as f:
-        f.write(str(history_id))
+    def save_history_id(self, history_id):
+        with open(self.get_history_id_path(), "w") as file:
+            file.write(str(history_id))
 
-def check_for_new_emails(service, last_history_id):
-    response = gmail.fetch_new_emails(service, last_history_id)
+    def get_history_id_path(self):
+        user_dir = gmail.get_user_directory(self.email_address)
+        return os.path.join(user_dir, HISTORY_ID_FILENAME)
+    
+    def check_for_new_emails(self, service, last_history_id):
+        response = gmail.fetch_new_emails(service, last_history_id)
 
-    history = response.get("history", [])
-    message_ids = []
-    for record in history:
-        for msg in record.get("messages", []):
-            message_ids.append(msg["id"])
+        history = response.get("history", [])
+        message_ids = []
+        for record in history:
+            for msg in record.get("messages", []):
+                message_ids.append(msg["id"])
 
-    return message_ids, response.get("historyId")
-
-def start_gmail_watcher():
-    print("Starting Gmail watcher...")
-
-    print("Authenticating with Gmail...")
-    service = authenticate_gmail()
-    print("Authenticated successfully.")
-
-    history_id = load_history_id(service)
-    print(f"Current history ID: {history_id}")
-
-    print("Gmail watcher started successfully.")
-
-    try:
-        while True:
-            print("Polling for new emails...")
-            message_ids, new_history_id = check_for_new_emails(service, history_id)
-            if message_ids:
-                print(f"Found new message IDs: {message_ids}")
-            # Save the updated history ID for next poll
-            if new_history_id:
-                save_history_id(new_history_id)
-                history_id = new_history_id
-            time.sleep(10)
-    except KeyboardInterrupt:
-        print("Gmail watcher stopped by user.")
+        return message_ids, response.get("historyId")
