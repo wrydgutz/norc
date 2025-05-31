@@ -16,7 +16,8 @@ SCOPES = [
 TOKEN_DIR = "secrets/tokens"
 CLIENT_SECRET_PATH = "secrets/gmail_client_secret.json"
 
-ACCOUNTS_PATH = "secrets/accounts.json"
+ACCOUNTS_DIR = "secrets/accounts"
+TOKEN_FILENAME = "token.pickle"
 
 def build_service(credentials):
     return build("gmail", "v1", credentials=credentials)
@@ -56,11 +57,15 @@ def refreshIfNeeded(email_address):
     return True
 
 def get_token_path(email_address):
-    token_path = os.path.join(TOKEN_DIR, get_token_filename(email_address))
+    token_path = os.path.join(get_email_directory(email_address), TOKEN_FILENAME)
+    os.makedirs(os.path.dirname(token_path), exist_ok=True)
     return token_path
 
-def get_token_filename(email_address):
-    return email_address.replace("@", "_").replace(".", "_") + ".pickle"
+def get_email_directory(email_address):
+    return os.path.join(ACCOUNTS_DIR, sanitize_email(email_address))
+
+def sanitize_email(email_address):
+    return email_address.replace("@", "_").replace(".", "_")
 
 def fetch_profile(service, userId="me"):
     return service.users().getProfile(userId=userId).execute()
