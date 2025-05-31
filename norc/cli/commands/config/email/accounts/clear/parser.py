@@ -3,6 +3,7 @@
 
 import sys
 import os
+import shutil
 
 import norc.email.gmail as gmail
 import norc.email.accounts as accounts
@@ -22,7 +23,8 @@ def dispatch(args, command):
     if command != COMMAND_NAME:
         return
     
-    os.removedirs(gmail.TOKEN_DIR)
+    if os.path.exists(gmail.ACCOUNTS_DIR):
+        shutil.rmtree(gmail.ACCOUNTS_DIR)
     accounts.clear()
     print("All email accounts cleared.")
     sys.exit(0)
