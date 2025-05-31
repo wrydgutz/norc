@@ -50,11 +50,16 @@ def refreshIfNeeded(email_address):
         print(f"No credentials found for {email_address}. Please authenticate first.")
         return False
 
-    if creds.valid or not creds.expired or not creds.refresh_token:
+    # If already valid, or can't be refreshed, no need to refresh
+    if creds.valid or not creds.refresh_token:
         return True
     
-    creds.refresh(Request())
-    return True
+    # Refresh if possible
+    if creds.expired and creds.refresh_token:
+        creds.refresh(Request())
+        return True
+    
+    return False
 
 def get_token_path(email_address):
     token_path = os.path.join(get_user_directory(email_address), TOKEN_FILENAME)
@@ -67,6 +72,21 @@ def get_user_directory(email_address):
 def sanitize_email(email_address):
     return email_address.replace("@", "_").replace(".", "_")
 
+def watch(gmail_service, user_id, topic_name):    
+    try:
+        response = gmail_service.users().watch(
+            userId=user_id,
+            body={
+                'topicName': topic_name
+            }
+        ).execute()
+        
+        return response
+        
+    except Exception as e:
+        print(f"Error registering watch for {user_id}: {e}")
+        return None
+
 def fetch_profile(service, userId="me"):
     return service.users().getProfile(userId=userId).execute()
 
@@ -75,4 +95,11 @@ def fetch_new_emails(service, startHistoryId, userId="me", historyTypes=["messag
         userId=userId,
         startHistoryId=startHistoryId,
         historyTypes=historyTypes
+    ).execute()
+
+def fetch_message(service, userId, message_id, format="full"):
+    return service.users().messages().get(
+        userId=userId,
+        id=message_id,
+        format=format
     ).execute()
