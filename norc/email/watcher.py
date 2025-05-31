@@ -21,6 +21,31 @@ CREDENTIALS_PATH = "secrets/gmail_client_secret.json"
 
 HISTORY_ID_PATH = "secrets/history_id.txt"
 
+POLL_INTERVAL_SEC_DEFAULT = 10
+
+class Watcher:
+    def __init__(self, email_address, poll_interval_sec=POLL_INTERVAL_SEC_DEFAULT):
+        self.email_address = email_address
+        self.poll_interval_sec = poll_interval_sec
+
+    def authenticate(self):
+        creds = gmail.load_token(self.email_address)
+        if not gmail.refreshIfNeeded(self.email_address):
+            return None
+        return gmail.build_service(creds)
+    
+    def run(self, shutdown_event):
+        service = self.authenticate()
+
+        while not shutdown_event.is_set():
+            print(f"Watcher ({self.email_address}): Checking new emails...")
+            # TODO: Implement
+            shutdown_event.wait(timeout=self.poll_interval_sec)
+
+        print(f"Watcher ({self.email_address}): stopped.", flush=True)
+            
+
+
 # TODO: Remove as this is already in gmail.py but broken down into functions.
 def authenticate_gmail():
     creds = None

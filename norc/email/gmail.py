@@ -18,11 +18,14 @@ CLIENT_SECRET_PATH = "secrets/gmail_client_secret.json"
 
 ACCOUNTS_PATH = "secrets/accounts.json"
 
+def build_service(credentials):
+    return build("gmail", "v1", credentials=credentials)
+
 def authenticate():
     # Login to Gmail
     flow = InstalledAppFlow.from_client_secrets_file(CLIENT_SECRET_PATH, SCOPES)
     creds = flow.run_local_server(port=0)
-    service = build("gmail", "v1", credentials=creds)
+    service = build_service(creds)
     return service, creds
 
 def save_token(email_address, creds):
@@ -40,16 +43,17 @@ def load_token(email_address):
         creds = pickle.load(token)
         return creds
 
-def refresh(email_address):
+def refreshIfNeeded(email_address):
     creds = load_token(email_address)
     if not creds:
         print(f"No credentials found for {email_address}. Please authenticate first.")
-        return
+        return False
 
     if creds.valid or not creds.expired or not creds.refresh_token:
-        return
+        return True
     
     creds.refresh(Request())
+    return True
 
 def get_token_path(email_address):
     token_path = os.path.join(TOKEN_DIR, get_token_filename(email_address))

@@ -3,8 +3,10 @@
 
 import argparse
 import sys
+import threading
+import time
 
-from norc.email import gmail_watcher
+import norc.service.run_service as run_service
 
 COMMAND_NAME = "run"
 
@@ -25,5 +27,19 @@ def dispatch(args, command):
     if command != COMMAND_NAME:
         return
     
-    gmail_watcher.start_gmail_watcher()
+    # Start the run service in a separate thread
+    shutdown_event = threading.Event()
+    worker_thread = threading.Thread(target=run_service.run, args=(shutdown_event,))
+    worker_thread.start()
+
+    # Listen for the KeyboardInterrupt to gracefully shut down
+    try:
+        while not shutdown_event.is_set():
+            time.sleep(1)
+    except KeyboardInterrupt:
+        print("\nShutting down gracefully...")
+        shutdown_event.set()
+
+    # Wait for the worker thread to finish and exit.
+    worker_thread.join()
     sys.exit(0)
