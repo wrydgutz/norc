@@ -3,6 +3,7 @@
 
 import sys
 
+import norc.email.gmail as gmail
 import norc.email.accounts as accounts
 
 COMMAND_NAME = "add"
@@ -14,16 +15,20 @@ def build_parser(subparsers):
     global parser
 
     parser = subparsers.add_parser(COMMAND_NAME, help="Authenticates an account and adds it to the list.")
-    parser.add_argument(ARG_EMAIL_ADDRESS, type=str, help="Email address to authenticate and add.")
-
+    
     return parser
 
 def dispatch(args, command):
     if command != COMMAND_NAME:
         return
     
-    arg_email_address = getattr(args, ARG_EMAIL_ADDRESS)
-    accounts.add(arg_email_address)
-    
-    print(f"'{arg_email_address}' added.")
+    service, creds = gmail.authenticate()
+    profile = gmail.fetch_profile(service)
+    email_address = profile["emailAddress"]
+    gmail.save_token(email_address, creds)
+
+    print(f"Authenticated as {email_address}")
+
+    accounts.add(email_address)
+    print(f"'{email_address}' authenticated and added.")
     sys.exit(0)

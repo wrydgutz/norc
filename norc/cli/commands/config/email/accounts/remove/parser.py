@@ -2,7 +2,9 @@
 # MIT License © 2025 Wrydrick Gutierrez
 
 import sys
+import os
 
+import norc.email.gmail as gmail
 import norc.email.accounts as accounts
 
 COMMAND_NAME = "remove"
@@ -23,6 +25,8 @@ def dispatch(args, command):
         return
     
     arg_email_address = getattr(args, ARG_EMAIL_ADDRESS)
+    token_path = gmail.get_token_path(arg_email_address)
+    os.remove(token_path)
     accounts.remove(arg_email_address)
     print(f"'{arg_email_address}' removed.")
     sys.exit(0)

@@ -2,7 +2,9 @@
 # MIT License © 2025 Wrydrick Gutierrez
 
 import sys
+import os
 
+import norc.email.gmail as gmail
 import norc.email.accounts as accounts
 
 COMMAND_NAME = "clear"
@@ -20,6 +22,7 @@ def dispatch(args, command):
     if command != COMMAND_NAME:
         return
     
+    os.removedirs(gmail.TOKEN_DIR)
     accounts.clear()
     print("All email accounts cleared.")
     sys.exit(0)
