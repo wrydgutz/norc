@@ -5,6 +5,8 @@ import os.path
 import pickle
 import time
 
+import norc.email.gmail as gmail
+
 from google.auth.transport.requests import Request
 from google_auth_oauthlib.flow import InstalledAppFlow
 from googleapiclient.discovery import build
@@ -19,6 +21,7 @@ CREDENTIALS_PATH = "secrets/gmail_client_secret.json"
 
 HISTORY_ID_PATH = "secrets/history_id.txt"
 
+# TODO: Remove as this is already in gmail.py but broken down into functions.
 def authenticate_gmail():
     creds = None
 
@@ -44,16 +47,6 @@ def authenticate_gmail():
     service = build("gmail", "v1", credentials=creds)
     return service
 
-def fetch_profile(service, userId="me"):
-    return service.users().getProfile(userId=userId).execute()
-
-def fetch_new_emails(service, startHistoryId, userId="me", historyTypes=["messageAdded"]):
-    return service.users().history().list(
-        userId=userId,
-        startHistoryId=startHistoryId,
-        historyTypes=historyTypes
-    ).execute()
-
 def load_history_id(service):
     if os.path.exists(HISTORY_ID_PATH):
         with open(HISTORY_ID_PATH, "r") as f:
@@ -61,9 +54,9 @@ def load_history_id(service):
         if history_id.isdigit():
             history_id = int(history_id)
         else: # Fallback
-            history_id = fetch_profile(service).get("historyId")
+            history_id = gmail.fetch_profile(service).get("historyId")
     else:
-        history_id = fetch_profile(service).get("historyId")
+        history_id = gmail.fetch_profile(service).get("historyId")
         save_history_id(history_id)
     return history_id
 
@@ -73,7 +66,7 @@ def save_history_id(history_id):
         f.write(str(history_id))
 
 def check_for_new_emails(service, last_history_id):
-    response = fetch_new_emails(service, last_history_id)
+    response = gmail.fetch_new_emails(service, last_history_id)
 
     history = response.get("history", [])
     message_ids = []
