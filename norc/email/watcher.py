@@ -1,4 +1,4 @@
-# norc/email/gmail_watcher.py
+# norc/email/watcher.py
 # MIT License © 2025 Wrydrick Gutierrez
 
 import os.path
