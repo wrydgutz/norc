@@ -3,6 +3,8 @@
 
 import sys
 
+import norc.email.accounts as accounts
+
 COMMAND_NAME = "clear"
 
 parser = None
@@ -18,6 +20,6 @@ def dispatch(args, command):
     if command != COMMAND_NAME:
         return
     
-    print("This command is not implemented yet. (placeholder)")
-        
+    accounts.clear()
+    print("All email accounts cleared.")
     sys.exit(0)

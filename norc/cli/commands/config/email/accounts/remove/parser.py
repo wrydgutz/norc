@@ -3,6 +3,8 @@
 
 import sys
 
+import norc.email.accounts as accounts
+
 COMMAND_NAME = "remove"
 ARG_EMAIL_ADDRESS = "email_address"
 
@@ -20,5 +22,7 @@ def dispatch(args, command):
     if command != COMMAND_NAME:
         return
     
-    print("This command is not implemented yet. (placeholder)")
+    arg_email_address = getattr(args, ARG_EMAIL_ADDRESS)
+    accounts.remove(arg_email_address)
+    print(f"'{arg_email_address}' removed.")
     sys.exit(0)

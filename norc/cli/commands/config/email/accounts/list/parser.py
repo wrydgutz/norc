@@ -3,6 +3,8 @@
 
 import sys
 
+import norc.email.accounts as accounts
+
 COMMAND_NAME = "list"
 
 parser = None
@@ -18,5 +20,13 @@ def dispatch(args, command):
     if command != COMMAND_NAME:
         return
     
-    print("This command is not implemented yet. (placeholder)")
+    accounts.load()
+    keys = accounts.load().keys()
+    if len(keys) == 0:
+        print("No email accounts found.")
+        sys.exit(1)
+
+    for email_address in accounts.load().keys():
+        print(email_address)
+
     sys.exit(0)
