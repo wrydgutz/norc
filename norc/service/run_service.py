@@ -168,7 +168,7 @@ def process_messages(service, email_address, message_ids):
     for msg_id in message_ids:
         response = gmail.fetch_message(service, email_address, msg_id)
         # TODO: Better if this could be specified via CLI arg.
-        dump(response, "messages", msg_id)
+        # dump(response, "messages", msg_id)
 
         from_address, subject = extract_info(response)
         if from_address in blacklist:
