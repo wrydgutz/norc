@@ -78,37 +78,38 @@ def process_gmail_notification(message):
     global accounts
 
     try:
-        email_address, new_history_id = decode_message(message)
+        email_address, notif_history_id = decode_message(message)
     except Exception as e:
         print(f"Error processing Pub/Sub message: {e}")
         print(f"Message data: {message.data.decode('utf-8', errors='ignore')}")
         message.ack() # Acknowledge to prevent reprocessing bad messages endlessly
         return
     
-    print(f"{email_address}: Notified with historyId: {new_history_id}")
-    
-    if not email_address or not new_history_id:
+    if not email_address or not notif_history_id:
         print("Invalid notification payload. Missing emailAddress or historyId.")
         message.ack()
         return
     
+    print(f"{email_address} ({notif_history_id}): Notified.")
+    
     if email_address not in accounts.keys():
-        print(f"{email_address}: Email address not found in accounts. Skipping.")
+        print(f"{email_address} ({notif_history_id}): Email address not found in accounts. Skipping.")
         message.ack()
         return
 
     with locks[email_address]: # Aquire lock per email address
         last_history_id = accounts[email_address]["lastHistoryId"]
+        print(f"{email_address} ({notif_history_id}): Checking for changes since {last_history_id}.")
         
-        if new_history_id == last_history_id:
-            print(f"{email_address}: History ID {new_history_id} already processed. Skipping.")
+        if int(notif_history_id) <= int(last_history_id):
+            print(f"{email_address} ({notif_history_id}): History ID {notif_history_id} already processed. Skipping.")
             message.ack()
             return
 
         # Get Gmail service for the specific user
         service = authenticate(email_address)
         if not service:
-            print(f"{email_address}: Could not get Gmail service. Will retry later.")
+            print(f"{email_address} ({notif_history_id}): Could not get Gmail service. Will retry later.")
             message.nack() # Negative acknowledge, Pub/Sub will re-deliver
             return
 
@@ -117,22 +118,24 @@ def process_gmail_notification(message):
 
         history = response.get("history", [])
         if not history:
-            print(f"{email_address}: No new changes found since {last_history_id}.")
-
+            print(f"{email_address} ({notif_history_id}): No new changes found since {last_history_id}.")
+        
         message_ids = []
         for record in history:
-            messages = record.get("messages", [])
-            for msg in messages:
+            messagesAdded = record.get("messagesAdded", [])
+            for msgAdded in messagesAdded:
+                msg = msgAdded.get("message")
                 message_ids.append(msg["id"])
 
         if message_ids:
-            print(f"{email_address}: Found new messages.")
+            print(f"{email_address} ({notif_history_id}): Found new messages.")
 
         for msg_id in message_ids:
             response = gmail.fetch_message(service, email_address, msg_id)
             print(f"  Subject: {next((h['value'] for h in response['payload']['headers'] if h['name'] == 'Subject'), 'No Subject')}")
 
-        accounts[email_address]["lastHistoryId"] = new_history_id
+        print(f"{email_address} ({notif_history_id}): Updating last history id with {notif_history_id}.")
+        accounts[email_address]["lastHistoryId"] = notif_history_id
         email_accounts.save(accounts)
         message.ack()
         
@@ -141,5 +144,5 @@ def decode_message(message):
     notification_payload = json.loads(decoded_data)
     
     email_address = notification_payload.get('emailAddress')
-    new_history_id = notification_payload.get('historyId')
-    return email_address, new_history_id
+    history_id = notification_payload.get('historyId')
+    return email_address, history_id
