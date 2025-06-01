@@ -166,7 +166,12 @@ def get_message_ids(history):
 
 def process_messages(service, email_address, message_ids):
     for msg_id in message_ids:
-        response = gmail.fetch_message(service, email_address, msg_id)
+        try:
+            response = gmail.fetch_message(service, email_address, msg_id)
+        except Exception as exception:
+            print(f"{email_address}: Failed to fetch message {msg_id}: {exception}")
+            continue
+        
         # TODO: Better if this could be specified via CLI arg.
         # dump(response, "messages", msg_id)
 
