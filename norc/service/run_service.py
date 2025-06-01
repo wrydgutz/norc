@@ -22,6 +22,8 @@ os.environ["GOOGLE_APPLICATION_CREDENTIALS"] = SERVICE_ACCOUNT_KEY_FILE
 accounts = None
 locks = defaultdict(threading.Lock)
 
+DUMP_DIR = "secrets/dumps"
+
 def run():
     global accounts
     accounts = email_accounts.load()
@@ -115,6 +117,13 @@ def process_gmail_notification(message):
 
         # Fetch history changes
         response = gmail.fetch_new_emails(service, last_history_id, email_address)
+
+        # TODO: Better if this could be specified via CLI arg.
+        # Dump response to a file for debugging purposes
+        # os.makedirs(DUMP_DIR, exist_ok=True)
+        # dump_file = os.path.join(DUMP_DIR, f"{notif_history_id}.json")
+        # with open(dump_file, 'w') as f:
+        #     json.dump(response, f, indent=2)
 
         history = response.get("history", [])
         if not history:
