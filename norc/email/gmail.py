@@ -103,3 +103,12 @@ def fetch_message(service, userId, message_id, format="full"):
         id=message_id,
         format=format
     ).execute()
+
+def mark_as_read(service, userId, message_id):
+    return service.users().messages().modify(
+        userId=userId,
+        id=message_id,
+        body={
+            "removeLabelIds": ["UNREAD"]
+        }
+    ).execute()

@@ -6,10 +6,12 @@ import os
 import threading
 
 import norc.email.accounts as email_accounts
+import norc.email.blacklist as email_blacklist
 import norc.email.gmail as gmail
 
 from google.cloud import pubsub_v1
 from collections import defaultdict
+from email.utils import parseaddr
 
 PROJECT_ID = "norc-461313"
 SUBSCRIPTION_ID = "gmail-notifications-sub"
@@ -20,13 +22,15 @@ SERVICE_ACCOUNT_KEY_FILE = "secrets/norc_gmail-pubsub-consumer_key.json"
 os.environ["GOOGLE_APPLICATION_CREDENTIALS"] = SERVICE_ACCOUNT_KEY_FILE
 
 accounts = None
+blacklist = None
 locks = defaultdict(threading.Lock)
 
 DUMP_DIR = "secrets/dumps"
 
 def run():
-    global accounts
+    global accounts, blacklist
     accounts = email_accounts.load()
+    blacklist = email_blacklist.load_blacklist()
 
     # TODO: The watch expires after 7 days. So we need to periodically refresh the watch.
     for email_address in accounts.keys():
@@ -132,19 +136,11 @@ def process_gmail_notification(message):
         # Update the last history ID with the latest one in the response after fetching new emails.
         new_history_id = response.get("historyId", notif_history_id)
 
-        message_ids = []
-        for record in history:
-            messagesAdded = record.get("messagesAdded", [])
-            for msgAdded in messagesAdded:
-                msg = msgAdded.get("message")
-                message_ids.append(msg["id"])
-
+        message_ids = get_message_ids(history)
         if message_ids:
             print(f"{email_address} ({notif_history_id}): Found new messages.")
 
-        for msg_id in message_ids:
-            response = gmail.fetch_message(service, email_address, msg_id)
-            print(f"  Subject: {next((h['value'] for h in response['payload']['headers'] if h['name'] == 'Subject'), 'No Subject')}")
+        process_messages(service, email_address, message_ids)
 
         print(f"{email_address} ({notif_history_id}): Updating last history id with {new_history_id}.")
         accounts[email_address]["lastHistoryId"] = new_history_id
@@ -158,3 +154,45 @@ def decode_message(message):
     email_address = notification_payload.get('emailAddress')
     history_id = notification_payload.get('historyId')
     return email_address, history_id
+
+def get_message_ids(history):
+    message_ids = []
+    for record in history:
+        messagesAdded = record.get("messagesAdded", [])
+        for msgAdded in messagesAdded:
+            msg = msgAdded.get("message")
+            message_ids.append(msg["id"])
+    return message_ids
+
+def process_messages(service, email_address, message_ids):
+    for msg_id in message_ids:
+        response = gmail.fetch_message(service, email_address, msg_id)
+        # TODO: Better if this could be specified via CLI arg.
+        dump(response, "messages", msg_id)
+
+        from_address, subject = extract_info(response)
+        if from_address in blacklist:
+            gmail.mark_as_read(service, email_address, msg_id)
+            print(f"{email_address}: Message blacklisted and marked as read ({from_address}, '{subject}').")
+            continue
+
+        print(f"{email_address}: Message ignored ({from_address}, '{subject}')")
+        
+
+def extract_info(message):
+    headers = message["payload"]["headers"]
+    from_address, subject = None, None
+    for header in headers:
+        if header["name"].lower() == "from":
+            name, addr = parseaddr(header["value"])
+            from_address = addr
+        elif header["name"].lower() == "subject":
+            subject = header["value"]
+    return from_address, subject
+
+def dump(response, dir, name):
+    dump_dir = os.path.join(DUMP_DIR, dir)
+    os.makedirs(dump_dir, exist_ok=True)
+    dump_file = os.path.join(dump_dir, f"{name}.json")
+    with open(dump_file, 'w') as f:
+        json.dump(response, f, indent=2)
