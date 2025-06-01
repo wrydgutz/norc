@@ -120,6 +120,9 @@ def process_gmail_notification(message):
         if not history:
             print(f"{email_address} ({notif_history_id}): No new changes found since {last_history_id}.")
         
+        # Update the last history ID with the latest one in the response after fetching new emails.
+        new_history_id = response.get("historyId", notif_history_id)
+
         message_ids = []
         for record in history:
             messagesAdded = record.get("messagesAdded", [])
@@ -134,8 +137,8 @@ def process_gmail_notification(message):
             response = gmail.fetch_message(service, email_address, msg_id)
             print(f"  Subject: {next((h['value'] for h in response['payload']['headers'] if h['name'] == 'Subject'), 'No Subject')}")
 
-        print(f"{email_address} ({notif_history_id}): Updating last history id with {notif_history_id}.")
-        accounts[email_address]["lastHistoryId"] = notif_history_id
+        print(f"{email_address} ({notif_history_id}): Updating last history id with {new_history_id}.")
+        accounts[email_address]["lastHistoryId"] = new_history_id
         email_accounts.save(accounts)
         message.ack()
         
