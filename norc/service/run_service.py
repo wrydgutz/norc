@@ -3,11 +3,13 @@
 
 import json
 import os
+import threading
 
 import norc.email.accounts as email_accounts
 import norc.email.gmail as gmail
 
 from google.cloud import pubsub_v1
+from collections import defaultdict
 
 PROJECT_ID = "norc-461313"
 SUBSCRIPTION_ID = "gmail-notifications-sub"
@@ -18,6 +20,7 @@ SERVICE_ACCOUNT_KEY_FILE = "secrets/norc_gmail-pubsub-consumer_key.json"
 os.environ["GOOGLE_APPLICATION_CREDENTIALS"] = SERVICE_ACCOUNT_KEY_FILE
 
 accounts = None
+locks = defaultdict(threading.Lock)
 
 def run():
     global accounts
@@ -94,43 +97,44 @@ def process_gmail_notification(message):
         message.ack()
         return
 
-    last_history_id = accounts[email_address]["lastHistoryId"]
-    
-    if new_history_id == last_history_id:
-        print(f"{email_address}: History ID {new_history_id} already processed. Skipping.")
+    with locks[email_address]: # Aquire lock per email address
+        last_history_id = accounts[email_address]["lastHistoryId"]
+        
+        if new_history_id == last_history_id:
+            print(f"{email_address}: History ID {new_history_id} already processed. Skipping.")
+            message.ack()
+            return
+
+        # Get Gmail service for the specific user
+        service = authenticate(email_address)
+        if not service:
+            print(f"{email_address}: Could not get Gmail service. Will retry later.")
+            message.nack() # Negative acknowledge, Pub/Sub will re-deliver
+            return
+
+        # Fetch history changes
+        response = gmail.fetch_new_emails(service, last_history_id, email_address)
+
+        history = response.get("history", [])
+        if not history:
+            print(f"{email_address}: No new changes found since {last_history_id}.")
+
+        message_ids = []
+        for record in history:
+            messages = record.get("messages", [])
+            for msg in messages:
+                message_ids.append(msg["id"])
+
+        if message_ids:
+            print(f"{email_address}: Found new messages.")
+
+        for msg_id in message_ids:
+            response = gmail.fetch_message(service, email_address, msg_id)
+            print(f"  Subject: {next((h['value'] for h in response['payload']['headers'] if h['name'] == 'Subject'), 'No Subject')}")
+
+        accounts[email_address]["lastHistoryId"] = new_history_id
+        email_accounts.save(accounts)
         message.ack()
-        return
-
-    # Get Gmail service for the specific user
-    service = authenticate(email_address)
-    if not service:
-        print(f"{email_address}: Could not get Gmail service. Will retry later.")
-        message.nack() # Negative acknowledge, Pub/Sub will re-deliver
-        return
-
-    # Fetch history changes
-    response = gmail.fetch_new_emails(service, last_history_id, email_address)
-
-    history = response.get("history", [])
-    if not history:
-        print(f"{email_address}: No new changes found since {last_history_id}.")
-
-    message_ids = []
-    for record in history:
-        messages = record.get("messages", [])
-        for msg in messages:
-            message_ids.append(msg["id"])
-
-    if message_ids:
-        print(f"{email_address}: Found new messages.")
-
-    for msg_id in message_ids:
-        response = gmail.fetch_message(service, email_address, msg_id)
-        print(f"  Subject: {next((h['value'] for h in response['payload']['headers'] if h['name'] == 'Subject'), 'No Subject')}")
-                
-    accounts[email_address]["lastHistoryId"] = new_history_id
-    email_accounts.save(accounts)
-    message.ack()
         
 def decode_message(message):
     decoded_data = message.data.decode('utf-8')
