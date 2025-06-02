@@ -1,2 +1,4 @@
 # norc
-Silent automation assistant. Watches your inbox, parses what matters, and keeps your life sorted — without the noise.
+My personal silent automation assistant. Watches my Gmail inboxes, parses what matters, marks unimportant stuff read, and keeps life sorted — without the noise.
+
+Status: In progress.
