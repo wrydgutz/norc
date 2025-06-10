@@ -4,6 +4,7 @@
 import json
 import os
 import threading
+import time
 
 import norc.email.accounts as email_accounts
 import norc.email.blacklist as email_blacklist
@@ -21,6 +22,8 @@ TOPIC_NAME = f"projects/{PROJECT_ID}/topics/{TOPIC_ID}"
 SERVICE_ACCOUNT_KEY_FILE = "secrets/norc_gmail-pubsub-consumer_key.json"
 os.environ["GOOGLE_APPLICATION_CREDENTIALS"] = SERVICE_ACCOUNT_KEY_FILE
 
+DAILY_INTERVAL = 24 * 60 * 60
+
 accounts = None
 blacklist = None
 locks = defaultdict(threading.Lock)
@@ -32,10 +35,10 @@ def run():
     accounts = email_accounts.load()
     blacklist = email_blacklist.load_blacklist()
 
-    # TODO: The watch expires after 7 days. So we need to periodically refresh the watch.
     for email_address in accounts.keys():
         service = authenticate(email_address)
         register_watch_if_needed(service, email_address)
+        refresh_watcher_periodically(email_address, DAILY_INTERVAL)
 
     # Start listening for Gmail notifications
     listen_for_gmail_notifications()
@@ -59,6 +62,16 @@ def register_watch_if_needed(service, email_address):
     accounts[email_address]["expiration"] = response["expiration"]
     email_accounts.save(accounts)
     print(f"Registered watch for '{email_address}' with history ID: {response['historyId']} and expiration: {response['expiration']}")
+
+def refresh_watcher_periodically(email_address, interval = 10):
+    thread = threading.Thread(target=do_refresh_watcher_periodically, args=(email_address, interval,), daemon=True)
+    thread.start()
+    
+def do_refresh_watcher_periodically(email_address, interval = 10):
+    while True:
+        time.sleep(interval)
+        gmail.refresh(email_address)
+        print(f"{email_address}: Watcher refreshed.")
 
 def listen_for_gmail_notifications():
     subscriber = pubsub_v1.SubscriberClient()

@@ -61,6 +61,11 @@ def refreshIfNeeded(email_address):
     
     return False
 
+def refresh(email_address):
+    creds = load_token(email_address)
+    creds.refresh(Request())
+    save_token(email_address, creds)
+
 def get_token_path(email_address):
     token_path = os.path.join(get_user_directory(email_address), TOKEN_FILENAME)
     os.makedirs(os.path.dirname(token_path), exist_ok=True)
